@@ -1,0 +1,30 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%% RESULTS REPORTER WORKER
+
+-module(results_reporter).
+-behaviour(gen_server).
+
+result_reporter(ResultA, ResultB, ResultCount, PartitionCount, ResultAFilePath, ResultBFilePath, EOF) ->
+    if EOF and ResultCount == PartitionCount ->
+	    write_results(ResultA, ResultB, ResultAFilePath, ResultBFilePath);
+       true ->
+	    receive
+		eof -> 
+		    result_reporter(ResultA, ResultB, ResultCount, PartitionCount,ResultAFilePath, ResultBFilePath, true);
+		increase_partition_count -> 
+			    result_reporter(ResultA, ResultB, ResultCount + 1, PartitionCount,ResultAFilePath, ResultBFilePath, EOF);
+	        {add_result_a, {Color, NewCount, NewDegree}} ->
+		    UpdatedResultA = maps:update_with(Color, 
+						fun({Count, Degree}) -> 
+							{Count + NewCount, Degree + NewDegree} end,
+						ResultA),
+		    result_reporter(UpdatedResultA, ResultB, ResultCount + 1, PartitionCount,ResultAFilePath, ResultBFilePath, EOF);
+		{add_result_b, {PartitionId, MostInfluentialNodes}} ->
+		    NewMostInfluentialNodes = maps:update_with(PartitionId,
+							       fun(M) -> M ++ MostInfluentialNodes end,
+							       ResultB),
+		    result_reporter(ResultA, NewMostInfluentialNodes, ResultCount + 1, PartitionCount,ResultAFilePath, ResultBFilePath, EOF)
+	    after 1000 -> 
+		    exit("Failed to process entire list")
+	    end
+    end.
