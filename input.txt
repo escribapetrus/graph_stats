@@ -9,4 +9,4 @@ green,red,green,green
 partition 2
 8,9,10,11
 red,blue,blue,red
-8,9 8,10, 8,11 9,10 9,11 10,11 8,5 9,0
+8,9 8,10 8,11 9,10 9,11 10,11 8,5 9,0
