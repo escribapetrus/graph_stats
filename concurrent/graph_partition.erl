@@ -2,6 +2,7 @@
 -behaviour(gen_server).
 -export([start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2]).
+-export([color_count_and_degrees/1]).
 
 
 -record(node, {id, color, edges = []}).
@@ -30,7 +31,7 @@ color_count_and_degrees(Nodes) when is_list(Nodes) ->
     ColorCountAndDegrees = fun(Color, ColorNodes, Acc) -> 
         ColorCountAndDegree = {
         Color,
-        length(Nodes),
+        length(ColorNodes),
         lists:foldl(CountEdges, 0, ColorNodes)
     }, [ColorCountAndDegree | Acc] end,
     ColorGroups = maps:groups_from_list(GroupByColor, Nodes),

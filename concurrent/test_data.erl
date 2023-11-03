@@ -1,7 +1,7 @@
 -module(test_data).
--export([get/0]).
+-export([nodes/0, color_counts_and_degrees/0]).
 
-get() -> 
+nodes() -> 
     [
      [
       {node,"0","blue",["1","2","3","9"]},
@@ -20,4 +20,11 @@ get() ->
       {node,"10","blue",["11","8","9"]},
       {node,"11","red",["8","9","10"]}
      ]
+    ].
+
+color_counts_and_degrees() ->
+    [
+     [{"red",1,3},{"green",1,4},{"blue",2,7}],
+     [{"red",1,4},{"green",3,10}],
+     [{"red",2,7},{"blue",2,7}]
     ].

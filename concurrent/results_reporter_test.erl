@@ -3,23 +3,7 @@
 
 test() ->
     {ok, _Pid} = results_reporter:start_link("../results_a_test.txt", "../results_b_test.txt"),
-    
-    TestData = [{"green", 4, 4},
-                 {"orange", 4, 4},
-                 {"purple", 4, 4},
-                 {"green", 4, 4},
-                 {"orange", 4, 4},
-                 {"purple", 4, 4},                
-                 {"green", 4, 4},
-                 {"orange", 4, 4},
-                 {"purple", 4, 4},                
-                 {"green", 4, 4},
-                 {"orange", 4, 4},
-                 {"purple", 4, 4},            
-                 {"green", 4, 4},
-                 {"orange", 4, 4},
-                 {"purple", 4, 4}
-                ],
+    TestData = lists:flatten(test_data:color_counts_and_degrees()),
 
     lists:foreach(fun({Color, Count, Degree}) -> 
                              results_reporter:add_color_count_and_degree(Color, Count, Degree)

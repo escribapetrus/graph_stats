@@ -33,7 +33,8 @@ init(#state{} = State) ->
 handle_cast({add_color_count_and_degree, {Color, NewCount, NewDegree}}, 
 	    #state{color_count_and_degrees = ColorCountAndDegrees} = State) ->
     Update = fun({Count, Degree}) -> {NewCount + Count, NewDegree + Degree} end,
-    UpdatedColorCountAndDegrees = maps:update_with(Color, Update, {0, 0}, ColorCountAndDegrees),
+    UpdatedColorCountAndDegrees = maps:update_with(Color, Update, {NewCount, NewDegree}, ColorCountAndDegrees),
+    io:format("Received color count and degree. State: ~p~n", [UpdatedColorCountAndDegrees]),
     {noreply, State#state{color_count_and_degrees = UpdatedColorCountAndDegrees}};
 
 handle_cast(write_color_count_and_degrees, 
