@@ -11,8 +11,7 @@ add_partition(Id, Nodes) ->
 	       start => {graph_partition, start_link, [Nodes]},
 	       restart => permanent,
 	       shutdown => 5000,
-	       type => worker,
-	       modules => [graph_partition]},
+	       type => worker},
     supervisor:start_child(?MODULE, ChildSpec).
 
 
@@ -25,8 +24,7 @@ init([ResultAPath, ResultBPath]) ->
                   start => {results_reporter, start_link, [ResultAPath, ResultBPath]},
                   restart => permanent,
                   shutdown => 5000,
-                  type => worker,
-                  modules => [graph_partition]}  
+                  type => worker}  
                  ],
     {ok, {SupFlags, ChildSpecs}}.
 

@@ -1,30 +1,35 @@
 -module(graph_partition).
--behaviour(gen_server).
--export([start_link/1, color_count_and_degree/1]).
--export([init/1, handle_call/3, handle_cast/2]).
+-behaviour(gen_statem).
+-export([start_link/1]).
+-export([init/1, callback_mode/0]).
+-export([calculating/3, reporting/3, still/3]).
 
 -record(node, {id, color, edges = []}).
 
 start_link(Nodes) ->
-    gen_server:start_link(?MODULE, Nodes, []).
+    gen_statem:start_link(?MODULE, Nodes, []).
+
+callback_mode() -> state_functions.
 
 init(Nodes) ->
-    gen_server:cast(self(), get_color_count_and_degree),
-    {ok, {Nodes, [], []}}.
+    io:format("init partition with nodes ~p~n", [Nodes]),
+    {ok, calculating, {Nodes, [], []}}.
 
-handle_cast(get_color_count_and_degree, {Nodes, _, MostInfluentialNodes}) ->
+calculating(_EventType, _EventContent, {Nodes, _, MostInfluentialNodes}) ->
+    io:format("~p: calculating color counts and degrees ~n", []),
     ColorCountsAndDegrees = color_count_and_degree(Nodes), 
-    gen_server:cast(self(), push_color_count_and_degree),
-    {noreply, {Nodes, ColorCountsAndDegrees, MostInfluentialNodes}};
 
-handle_cast(push_color_count_and_degree, {_, Result, _} = State) ->
+    {next_state, reporting, {Nodes, ColorCountsAndDegrees, MostInfluentialNodes}}.
+
+reporting(_EventType, _EventContent, {_, Result, _} = State) ->
+    io:format("reporting color counts and degrees: ~p~n", [Result]),
     lists:foreach(fun({Color, Count, Degree}) -> 
                              results_reporter:add_color_count_and_degree(Color, Count, Degree)
                      end, Result), 
-    {noreply, State}.
+    {next_state, still, State}.
 
-handle_call(Message, _From, State) ->
-    {reply, Message, State}.
+still(_EventType, _EventContent, _State) ->
+    keep_state_and_data.
 
 color_count_and_degree(Nodes) when is_list(Nodes) ->
     GroupByColor = fun(#node{color = Color}) -> Color end,
@@ -37,3 +42,5 @@ color_count_and_degree(Nodes) when is_list(Nodes) ->
     }, [ColorCountAndDegree | Acc] end,
     ColorGroups = maps:groups_from_list(GroupByColor, Nodes),
     maps:fold(ColorCountAndDegrees, [], ColorGroups).
+
+

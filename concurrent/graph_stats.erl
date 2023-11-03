@@ -8,7 +8,6 @@
 			  edges = nil}).
 -record(node, {id, color, edges = []}).
 
-
 %% - Count the number of nodes of each color in the local partition gp.
 %% - For each color c in the local partition, 
 %%   sum the degree of the nodes of that color 
@@ -16,8 +15,7 @@
 %% - Return the node count and degree of each color in the local partition.
 
 start() ->
-    start("../input.txt", "../result_a.txt", "result_b.txt").
-    
+    start("../input.txt", "../result_a.txt", "../result_b.txt").
 
 start(InputPath, ResultAPath, ResultBPath) -> 
     graph_supervisor:start_link(ResultAPath, ResultBPath),
