@@ -20,19 +20,10 @@ start() ->
     
 
 start(InputPath, ResultAPath, ResultBPath) -> 
-    results_reporter:start_link(ResultAPath, ResultBPath),
+    graph_supervisor:start_link(ResultAPath, ResultBPath),
     process_input(InputPath),
     ok.
-    
 	    
-%% output:
-%{Color => {NumNodes, NumEdges}}
-
-
-	    
-%%%%%%%%%%%%%%%%%%%%%%%
-%% FILE PROCESSING
-
 process_input(Path) ->
     {ok, File} = file:open(Path, read),
     read_line(File, #partition_input{}),
@@ -70,16 +61,16 @@ read_line(File, #partition_input{node_ids = NodeIds, edges = nil} = PartitionInp
     Edges = lists:map(GetNodeEdges, NodeIds),
     read_line(File, PartitionInput#partition_input{edges = Edges});
 
-read_line(File, #partition_input{id = _PartitionId} = PartitionInput) ->
+read_line(File, #partition_input{id = PartitionId} = PartitionInput) ->
     case file:read_line(File) of
 	eof ->
 	    %% CALL RESULT REPORTER HERE
 	    Nodes = parse_nodes(PartitionInput),
-	    %% graph_partition:spawn_link(Nodes),
+	    graph_supervisor:add_partition(PartitionId, Nodes),
 	    ok;
 	{ok, Line} ->
 	    Nodes = parse_nodes(PartitionInput),
-	    %% graph_partition:spawn_link(Nodes),
+	    graph_supervisor:add_partition(PartitionId, Nodes),
 	    Id = string:trim(Line),
 	    read_line(File, #partition_input{id = Id})
     end.
@@ -92,9 +83,7 @@ parse_nodes(#partition_input{
         #node{id = NodeId, color = Color, edges = Edges_}
     end,
     NodeColors = lists:zip(NodeIds, Colors),
-    Res = lists:zipwith(BuildNode, Edges, NodeColors),
-    erlang:display(Res),
-    Res.
+    lists:zipwith(BuildNode, Edges, NodeColors).
 
 
 

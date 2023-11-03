@@ -4,11 +4,27 @@
 -export([init/1, handle_call/3, handle_cast/2]).
 
 -record(node, {id, color, edges = []}).
--record(color_count_and_degree, {color = nil, count = 0, degree = 0}).
--record(most_influential_node, {nodes = []}).
 
 start_link(Nodes) ->
     gen_server:start_link(?MODULE, Nodes, []).
+
+init(Nodes) ->
+    gen_server:cast(self(), get_color_count_and_degree),
+    {ok, {Nodes, [], []}}.
+
+handle_cast(get_color_count_and_degree, {Nodes, _, MostInfluentialNodes}) ->
+    ColorCountsAndDegrees = color_count_and_degree(Nodes), 
+    gen_server:cast(self(), push_color_count_and_degree),
+    {noreply, {Nodes, ColorCountsAndDegrees, MostInfluentialNodes}};
+
+handle_cast(push_color_count_and_degree, {_, Result, _} = State) ->
+    lists:foreach(fun({Color, Count, Degree}) -> 
+                             results_reporter:add_color_count_and_degree(Color, Count, Degree)
+                     end, Result), 
+    {noreply, State}.
+
+handle_call(Message, _From, State) ->
+    {reply, Message, State}.
 
 color_count_and_degree(Nodes) when is_list(Nodes) ->
     GroupByColor = fun(#node{color = Color}) -> Color end,
@@ -20,23 +36,4 @@ color_count_and_degree(Nodes) when is_list(Nodes) ->
         lists:foldl(CountEdges, 0, ColorNodes)
     }, [ColorCountAndDegree | Acc] end,
     ColorGroups = maps:groups_from_list(GroupByColor, Nodes),
-    maps:fold(ColorCountAndDegrees,[], ColorGroups);
-
-
-color_count_and_degree(Pid) ->
-    gen_server:call(Pid, color_count_and_degree).
-
-init(Nodes) ->
-    {ok, {Nodes, #color_count_and_degree{}, #most_influential_node{}}}.
-
-
-handle_call(color_count_and_degree, _From, {Nodes, _, _}) ->
-    Reply = color_count_and_degree(Nodes), 
-
-    {reply, Reply, {Nodes}}.
-
-
-
-handle_cast(_Request, State) ->
-    {noreply, State}.
-
+    maps:fold(ColorCountAndDegrees, [], ColorGroups).
