@@ -40,7 +40,6 @@ handle_cast(write_color_count_and_degrees,
             #state{
                color_count_and_degrees = ColorCountAndDegrees, 
                result_a_path = ResultAPath} = State) -> 
-    erlang:display("THIS EXECUTES"),
     {ok, File} = file:open(ResultAPath, [append]),
     WriteLine = fun(Color, {Count, Degree}) -> 
                         io:format(File, "~s: ~p ~p~n", [Color, Count, Degree])
