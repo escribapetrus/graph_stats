@@ -3,6 +3,7 @@
          add_color_count_and_degree/3, add_most_influential_nodes/2,
 	 write_color_count_and_degrees/0, write_most_influential_nodes/0]).
 -export([init/1, handle_cast/2, handle_call/3]).
+-export([test/0]).
 -behaviour(gen_server).
 
 -record(state, {color_count_and_degrees = maps:new(),
@@ -34,7 +35,6 @@ handle_cast({add_color_count_and_degree, {Color, NewCount, NewDegree}},
 	    #state{color_count_and_degrees = ColorCountAndDegrees} = State) ->
     Update = fun({Count, Degree}) -> {NewCount + Count, NewDegree + Degree} end,
     UpdatedColorCountAndDegrees = maps:update_with(Color, Update, {NewCount, NewDegree}, ColorCountAndDegrees),
-    io:format("Received color count and degree. State: ~p~n", [UpdatedColorCountAndDegrees]),
     {noreply, State#state{color_count_and_degrees = UpdatedColorCountAndDegrees}};
 
 handle_cast(write_color_count_and_degrees, 
@@ -60,4 +60,20 @@ handle_cast({add_result_b,
 
 handle_call(get_state, _From, State) ->		 
     {reply, State, State}.
+
+%%%%%%%%%%%%%%%%% TESTS
+
+test() ->
+    TestData = lists:flatten([
+     [{"red",1,3},{"green",1,4},{"blue",2,7}],
+     [{"red",1,4},{"green",3,10}],
+     [{"red",2,7},{"blue",2,7}]
+    ]),
+    {ok, _Pid} = results_reporter:start_link("../results_a_test.txt", "../results_b_test.txt"),
+
+    lists:foreach(fun({Color, Count, Degree}) -> 
+                             results_reporter:add_color_count_and_degree(Color, Count, Degree)
+                  end, TestData),
+    
+    results_reporter:write_color_count_and_degrees().
 

@@ -1,5 +1,6 @@
 -module(graph_stats).
 -export([start/0, start/3]).
+-export([test/0]).
 
 -record(partition_input, {
 			  id = nil, 
@@ -20,6 +21,7 @@ start() ->
 start(InputPath, ResultAPath, ResultBPath) -> 
     graph_supervisor:start_link(ResultAPath, ResultBPath),
     process_input(InputPath),
+    graph_supervisor:calculate_most_influential_nodes(),
     ok.
 	    
 process_input(Path) ->
@@ -60,15 +62,13 @@ read_line(File, #partition_input{node_ids = NodeIds, edges = nil} = PartitionInp
     read_line(File, PartitionInput#partition_input{edges = Edges});
 
 read_line(File, #partition_input{id = PartitionId} = PartitionInput) ->
+    Nodes = parse_nodes(PartitionInput),
+    graph_supervisor:add_partition(PartitionId, Nodes),
     case file:read_line(File) of
 	eof ->
 	    %% CALL RESULT REPORTER HERE
-	    Nodes = parse_nodes(PartitionInput),
-	    graph_supervisor:add_partition(PartitionId, Nodes),
 	    ok;
 	{ok, Line} ->
-	    Nodes = parse_nodes(PartitionInput),
-	    graph_supervisor:add_partition(PartitionId, Nodes),
 	    Id = string:trim(Line),
 	    read_line(File, #partition_input{id = Id})
     end.
@@ -84,7 +84,10 @@ parse_nodes(#partition_input{
     lists:zipwith(BuildNode, Edges, NodeColors).
 
 
+%%%%%%%%%%%%% TESTS
 
+test() ->
+    ok.
 
 
 			  
