@@ -1,10 +1,12 @@
 -module(graph_supervisor).
 -behaviour(supervisor).
--export([start_link/2, add_partition/2, calculate_most_influential_nodes/0,
-        fetch_degree/1]).
+-export([start_link/2, add_partition/2, 
+         calculate_most_influential_nodes/0,
+         neighbors/1]).
 -export([init/1]).
 -export([test_calculate_most_influential_nodes/0,
-         test_fetch_degree/0]).
+
+        test_data_nodes/0]).
 
 start_link(ResultAPath, ResultBPath) ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, [ResultAPath, ResultBPath]).
@@ -19,22 +21,23 @@ add_partition(Id, Nodes) ->
 
 calculate_most_influential_nodes() ->
     Children = supervisor:which_children(?MODULE),
-    SendMessage = fun({_Id, Pid, _, _}) -> 
-                          graph_partition:most_influential_nodes(Pid) end,
-    lists:foreach(SendMessage, Children).
+    lists:map(fun({"partition" ++ _, Pid, _, _}) -> 
+                          graph_partition:most_influential_nodes(Pid); 
+                     (_) -> 
+                          do_nothing
+                  end, Children).
 
-fetch_degree(NodeId) ->
-    Children = supervisor:which_children(?MODULE),
-    fetch_degree(NodeId, Children).
+neighbors(PartitionPid) ->
+    neighbors(PartitionPid, supervisor:which_children(?MODULE), []).
 
-fetch_degree(NodeId, []) -> {NodeId, 0};
-fetch_degree(NodeId, [{"partition" ++ _, Pid, _, _}|Rest]) ->
-    case graph_partition:degree(Pid, NodeId) of
-        0 -> fetch_degree(NodeId, Rest);
-        Value -> {NodeId, Value}
-    end;
-fetch_degree(NodeId, [_|Rest]) -> fetch_degree(NodeId, Rest).
-    
+neighbors(_, [], Acc) -> Acc;
+neighbors(PartitionPid, [{"partition" ++ _, Pid, _,_}|Rest], Acc) when PartitionPid == Pid ->
+    neighbors(PartitionPid, Rest, Acc);
+neighbors(PartitionPid, [{"partition" ++ _, Pid, _,_}|Rest], Acc) ->
+    neighbors(PartitionPid, Rest, [Pid|Acc]);
+neighbors(PartitionPid, [_| Rest], Acc) -> 
+    neighbors(PartitionPid, Rest, Acc).
+
 
 init([ResultAPath, ResultBPath]) ->
     SupFlags = #{strategy => one_for_one,
@@ -53,17 +56,9 @@ init([ResultAPath, ResultBPath]) ->
 %%%%%%%%%%%% TESTS
 
 test_calculate_most_influential_nodes() ->
-    graph_supervisor:start_link("../test_graph_supervisor_a.txt", "../test_graph_supervisor_b"),
+    {ok, _} = start_link("../test_graph_supervisor_a.txt", "../test_graph_supervisor_b"),
     lists:foreach(fun({Id, Nodes}) -> add_partition(Id, Nodes) end, test_data_nodes()),
     calculate_most_influential_nodes().
-
-test_fetch_degree() -> 
-    graph_supervisor:start_link("../test_graph_supervisor_a.txt", "../test_graph_supervisor_b"),
-    lists:foreach(fun({Id, Nodes}) -> add_partition(Id, Nodes) end, test_data_nodes()),
-    true = {9, 4} == fetch_degree(9),
-    true = {1, 4} == fetch_degree(1),
-    true = {12, 0} == fetch_degree(12).
-
 
 test_data_nodes() -> 
     [{"partition 0", [

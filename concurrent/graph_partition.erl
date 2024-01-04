@@ -5,10 +5,10 @@
 -export([
          color_count_and_degrees/1, 
          most_influential_nodes/1,
-         degree/2]).
+         degree/2, fetch_degree/2]).
 -export([
          test_color_count_and_degrees/0,
-         test_most_influential_nodes/0,
+        test_fetch_degree/0,
          test_degree/0]).
 
 -record(node, {id, color, edges = []}).
@@ -20,7 +20,7 @@ color_count_and_degrees(Pid) ->
     gen_server:cast(Pid, color_count_and_degrees).
 
 most_influential_nodes(Pid) ->
-    gen_server:cast(Pid, most_influential_nodes).
+    gen_server:call(Pid, most_influential_nodes).
 
 degree(Pid, NodeId) ->
     gen_server:call(Pid, {degree, NodeId}).
@@ -36,37 +36,36 @@ handle_call({degree, NodeId}, _From, Nodes) ->
             {reply, length(Value#node.edges), Nodes}
     end;
 
-handle_call(Message, _From, State) ->
-    {reply, Message, State}.
-
-handle_cast(most_influential_nodes, Nodes) ->
+handle_call(most_influential_nodes, _From, Nodes) ->
     %% - Get the degree of each internal node of Ap .
     %% - Find the list of external nodes connected to Ap . 
     %%   (Any node in the edge list that is not in the node list is an
-    %%   external node of Ap )
+    %%   external node of Ap)
     %% - For each external node n, message all other actors 
     %%   requesting the degree of node n. (An actor should return
     %%   0 if node n does not exist in their local partition).
     %% - Find the largest degree node(s) from among the 
     %%   internal and external nodes of actor Ap . If there are multiple
     %%   nodes of the same max degree, return all such nodes.
+    
+    NodeDegrees = [{N#node.id, length(N#node.edges)} || N <- Nodes],
     NodeIds = [N#node.id || N <- Nodes],    
     Edges = lists:flatten([N#node.edges || N <- Nodes]),
-    ExternalNodes = lists:filter(fun(X) -> not lists:member(X, NodeIds) end, Edges),
-    Res = lists:foldl(fun(Elem, [{_NodeId, Degree}|_] = Acc) -> 
-                        case graph_supervisor:fetch_degree(Elem) of
-                            {NodeId, Value} when Value > Degree ->
-                                [{NodeId, Value}];
-                            {NodeId, Value} when Value == Degree ->
-                                [{NodeId, Value}| Acc];
-                            _ -> Acc
-                                     
-                            end
-                end,
-                [{0, 0}],
-                NodeIds ++ ExternalNodes),
-    erlang:display(Res),
-    {noreply, Nodes};
+    ExternalNodeIds = lists:filter(fun(X) -> not lists:member(X, NodeIds) end, Edges),    
+    NeighborPartitions = graph_supervisor:neighbors(self()),   
+    ExternalNodeDegrees = lists:map(fun(X) -> 
+      fetch_degree(X, NeighborPartitions) end, ExternalNodeIds),
+    MostInfluentialNodes = lists:foldl(fun({NodeId, Degree}, [{_NodeId, AccDegree}|_] = Acc) -> 
+                                               if
+                                                   Degree > AccDegree ->
+                                                       [{NodeId, Degree}];
+                                                   Degree == AccDegree ->
+                                                       [{NodeId, Degree}| Acc];
+                                                   true -> 
+                                                       Acc
+                                               end
+                                       end, [{0, 0}], NodeDegrees ++ ExternalNodeDegrees),
+    {reply, [NodeId || {NodeId, _Degree} <- MostInfluentialNodes], Nodes}.
 
 handle_cast(color_count_and_degrees, Nodes) ->
     GroupByColor = fun(#node{color = Color}) -> Color end,
@@ -87,6 +86,15 @@ handle_cast(color_count_and_degrees, Nodes) ->
     {noreply, Nodes}.    
 
 
+fetch_degree(NodeId, []) -> {NodeId, 0};
+fetch_degree(NodeId, [Pid|Rest]) ->
+    case graph_partition:degree(Pid, NodeId) of
+        0 -> fetch_degree(NodeId, Rest);
+        Value -> {NodeId, Value}
+    end.
+
+
+
 %%%%%%%%%%%%%%% TESTS
 
 test_color_count_and_degrees() -> 
@@ -95,18 +103,19 @@ test_color_count_and_degrees() ->
         {ok, Pid} = graph_partition:start_link(Nodes), 
         Pid 
     end,
-    [Pid | _] = lists:map(StartPartition, test_data_nodes()),
-    erlang:display(sys:get_state(Pid)).
+    lists:map(StartPartition, test_data_nodes()),
+    ok.
 
-test_most_influential_nodes() -> 
-    results_reporter:start_link("../testA", "../testB"),
-    StartPartition = fun(Nodes) ->
+test_fetch_degree() -> 
+   [Pid1,Pid2,Pid3] = lists:map(fun(Nodes) ->
         {ok, Pid} = graph_partition:start_link(Nodes), 
         Pid 
-    end,
-    [Pid | _] = lists:map(StartPartition, test_data_nodes()),
-    most_influential_nodes(Pid),
-    ok.
+    end, test_data_nodes()),
+    true = {9, 4} == fetch_degree(9, [Pid1, Pid2, Pid3]),
+    true = {1, 4} == fetch_degree(1, [Pid1, Pid2, Pid3]),
+    true = {9, 0} == fetch_degree(9, [Pid1, Pid2]),
+    true = {12, 0} == fetch_degree(12, [Pid1, Pid2, Pid3]).
+
 
 test_degree() -> 
     [Pid | _] = lists:map(fun(Nodes) ->
@@ -116,7 +125,8 @@ test_degree() ->
     true = 4 == degree(Pid, 0),
     true = 3 == degree(Pid, 3),
     true = 0 == degree(Pid, 9),
-    true = 0 == degree(Pid, 12).
+    true = 0 == degree(Pid, 12),
+    ok.
 
 test_data_nodes() ->
     [[{node,0,"blue",[1,2,3,9]},
